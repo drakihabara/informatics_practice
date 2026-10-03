@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"/>
+<title>試験対策アプリ</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 0.5rem;
+    background: #f9f9f9;
+    color: #333;
+    font-size: 18px;
+    line-height: 1.6;
+  }
+  h1 {
+    text-align: center;
+    font-size: 1.8rem;
+    margin: 1.5rem 0 2rem;
+    color: #2c3e50;
+  }
+  .container {
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+  .tag-btn {
+    display: block;
+    width: 100%;
+    padding: 1.8rem 1rem;
+    margin: 1.2rem 0;
+    border: 1px solid #dcdde1;
+    border-radius: 15px;
+    font-size: 1.3rem;
+    font-weight: bold;
+    background: #fff;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    color: #2f3640;
+    text-decoration: none;
+    box-sizing: border-box;
+  }
+  .tag-btn:active {
+    background: #f5f6fa;
+    transform: scale(0.98);
+  }
+  .btn-s1 { border-left: 10px solid #f1c40f; }
+  .btn-s2 { border-left: 10px solid #e74c3c; }
+  .btn-s3 { border-left: 10px solid #3498db; }
+  #question { margin: 1.5rem 0.5rem; font-size: 1.25rem; font-weight: bold; line-height: 1.5; white-space: pre-wrap; }
+  #options { list-style: none; padding: 0; }
+  #options li { margin-bottom: 0.8rem; }
+  #options button {
+    width: 100%; padding: 1.3rem; font-size: 1.1rem; border: 1px solid #ccc;
+    border-radius: 12px; background: #fff; text-align: left;
+  }
+  #options button:disabled { opacity: 0.8; }
+  #progress { text-align: center; margin-top: 1.5rem; color: #888; font-size: 0.9rem; }
+  #overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.7); display: none;
+    align-items: center; justify-content: center; z-index: 100;
+  }
+  #modal { background: #fff; padding: 1.5rem; border-radius: 15px; width: 88%; max-width: 400px; box-sizing: border-box; }
+  #modal-message { font-size: 1.5rem; font-weight: bold; text-align: center; margin-bottom: 1rem; }
+  #modal-explanation {
+    font-size: 0.95rem; color: #444; margin-top: 1rem;
+    border-top: 1px solid #eee; padding-top: 1rem; line-height: 1.6;
+  }
+  #modalNextBtn {
+    display: block; width: 100%; padding: 1.3rem; margin-top: 1.5rem;
+    border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold;
+    background: #3498db; color: #fff;
+  }
+  .quiet-btn {
+    display: block; margin: 1.5rem auto 0; padding: 0.5rem 1rem;
+    background: none; border: none; color: #aaa;
+    font-size: 0.85rem; text-decoration: underline; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1 id="mainTitle">試験対策アプリ</h1>
+  <div id="term-select">
+    <button class="tag-btn btn-s1" onclick="showSubjects('01')">1学期</button>
+    <button class="tag-btn btn-s2" onclick="showSubjects('02')">2学期</button>
+    <button class="tag-btn btn-s3" onclick="showSubjects('03')">3学期</button>
+  </div>
+  <div id="subject-select" style="display:none;"></div>
+  <div id="quiz" style="display:none;">
+    <div id="question"></div>
+    <ul id="options"></ul>
+    <div id="progress"></div>
+    <button class="quiet-btn" onclick="backToSubjects()">やめる</button>
+  </div>
+  <div id="result" style="display:none; text-align:center;">
+    <div id="result-content"></div>
+    <button class="tag-btn" style="background:#d4edda; border-color:#28a745;" id="continueBtn" onclick="restartWithNewQuestions()">続ける</button>
+    <button class="quiet-btn" onclick="backToSubjects()">科目を選び直す</button>
+  </div>
+</div>
+<div id="overlay">
+  <div id="modal">
+    <div id="modal-message"></div>
+    <div id="modal-explanation"></div>
+    <button id="modalNextBtn">次へ ▶</button>
+  </div>
+</div>
+<script>
+  const QUESTION_COUNT = 20;
+  let allQuestions = [];
+  let questions = [];
+  let current = 0, score = 0, selectedTerm = '', currentFileName = '';
+
+  const termSubjects = {
+    '01': [
+      { tag: 'appA', text: 'アプリA' },
+      { tag: 'appB', text: 'アプリB' },
+      { tag: 'info2', text: '情報Ⅱ' },
+      { tag: 'infosys', text: '情報システム' },
+      { tag: 'infoex', text: '情報演習' },
+      { tag: 'content', text: 'コンテンツ' }
+    ],
+    '02': [
+      { tag: 'info2', text: '情報Ⅱ' },
+      { tag: 'infosys', text: '情報システム' }
+    ],
+    '03': [
+      { tag: 'info1', text: '情報I' },
+      { tag: 'info2', text: '情報II' },
+      { tag: 'appA', text: 'アプリA' },
+      { tag: 'appB', text: 'アプリB' }
+    ]
+  };
+
+  document.getElementById('continueBtn').textContent = `続ける（次の${QUESTION_COUNT}問）`;
+
+  function escapeHTML(str) {
+    if (!str) return "";
+    return String(str).replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#39;');
+  }
+
+  function showSubjects(term) {
+    selectedTerm = term;
+    document.getElementById('term-select').style.display = 'none';
+    const container = document.getElementById('subject-select');
+    container.innerHTML = '';
+    termSubjects[term].forEach(sub => {
+      const btn = document.createElement('button');
+      btn.className = 'tag-btn';
+      btn.textContent = sub.text;
+      btn.onclick = () => startQuiz(sub.tag);
+      container.appendChild(btn);
+    });
+    container.style.display = 'block';
+  }
+
+  function backToSubjects() {
+    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('quiz').style.display = 'none';
+    document.getElementById('result').style.display = 'none';
+    document.getElementById('mainTitle').style.display = 'block';
+    showSubjects(selectedTerm);
+  }
+
+  async function startQuiz(tag) {
+    document.getElementById('subject-select').style.display = 'none';
+    document.getElementById('mainTitle').style.display = 'none';
+    currentFileName = `${tag}_${selectedTerm}.csv`;
+    try {
+      allQuestions = await loadCSV(currentFileName);
+      if (allQuestions.length === 0) throw new Error('問題が0件です');
+    } catch(err) {
+      alert("CSV読み込み失敗: " + currentFileName + "\n" + err.message);
+      location.reload();
+      return;
+    }
+    restartWithNewQuestions();
+  }
+
+  function getClearedIds() {
+    try {
+      const data = localStorage.getItem('cleared_' + currentFileName);
+      return data ? JSON.parse(data) : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function saveClearedId(id) {
+    const cleared = getClearedIds();
+    if (!cleared.includes(id)) {
+      cleared.push(id);
+      try {
+        localStorage.setItem('cleared_' + currentFileName, JSON.stringify(cleared));
+      } catch(e) {}
+    }
+    setWrongId(id, false);
+  }
+
+  function getWrongIds() {
+    try {
+      const data = localStorage.getItem('wrong_' + currentFileName);
+      return data ? JSON.parse(data) : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function setWrongId(id, isWrong) {
+    let wrong = getWrongIds();
+    if (isWrong && !wrong.includes(id)) wrong.push(id);
+    else if (!isWrong) wrong = wrong.filter(w => w !== id);
+    else return;
+    try {
+      localStorage.setItem('wrong_' + currentFileName, JSON.stringify(wrong));
+    } catch(e) {}
+  }
+
+  function prepareQuestion(q) {
+    const order = q.options.map((_, i) => i);
+    if (order.length > 2) shuffle(order);
+    return {
+      ...q,
+      options: order.map(i => q.options[i]),
+      answer: order.indexOf(q.answer)
+    };
+  }
+
+  function restartWithNewQuestions() {
+    document.getElementById('result').style.display = 'none';
+    const clearedIds = getClearedIds();
+    const wrongIds = getWrongIds();
+    const wrong = allQuestions.filter(q => wrongIds.includes(q.id) && !clearedIds.includes(q.id));
+    const unsolved = allQuestions.filter(q => !wrongIds.includes(q.id) && !clearedIds.includes(q.id));
+    const solved = allQuestions.filter(q => clearedIds.includes(q.id));
+    const selection = shuffle([...wrong])
+      .concat(shuffle([...unsolved]), shuffle([...solved]))
+      .slice(0, QUESTION_COUNT);
+    questions = shuffle(selection).map(prepareQuestion);
+    current = 0; score = 0;
+    document.getElementById('quiz').style.display = 'block';
+    showQuestion();
+  }
+
+  function parseCSV(text) {
+    const rows = [];
+    let row = [], field = '', inQuote = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQuote) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; }
+          else inQuote = false;
+        } else field += ch;
+      } else if (ch === '"') {
+        inQuote = true;
+      } else if (ch === ',') {
+        row.push(field); field = '';
+      } else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        row.push(field); rows.push(row);
+        row = []; field = '';
+      } else field += ch;
+    }
+    if (field !== '' || row.length > 0) { row.push(field); rows.push(row); }
+    return rows;
+  }
+
+  async function loadCSV(file) {
+    const response = await fetch(file);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = (await response.text()).replace(/^\uFEFF/, '');
+    const rows = parseCSV(text).filter(r => r.some(c => c.trim() !== ''));
+    if (rows.length > 0 && rows[0][0].trim().toUpperCase() === 'ID') rows.shift();
+    const result = [];
+    rows.forEach((c, n) => {
+      const label = `${file} ${n + 1}件目（ID: ${c[0]}）`;
+      if (c.length < 5) { console.warn(label + ': 列が不足しています'); return; }
+      const answerNum = parseInt(c[c.length - 2], 10);
+      const rawOpts = c.slice(2, c.length - 2);
+      if (isNaN(answerNum) || answerNum < 1 || answerNum > rawOpts.length) {
+        console.warn(label + `: 正解番号「${c[c.length - 2]}」が不正です`); return;
+      }
+      if (!rawOpts[answerNum - 1] || rawOpts[answerNum - 1].trim() === '') {
+        console.warn(label + ': 正解の選択肢が空欄です'); return;
+      }
+      const opts = [];
+      let answer = -1;
+      rawOpts.forEach((opt, i) => {
+        if (opt && opt.trim() !== '') {
+          if (i === answerNum - 1) answer = opts.length;
+          opts.push(opt);
+        }
+      });
+      if (opts.length < 2) { console.warn(label + ': 選択肢が2つ未満です'); return; }
+      if (new Set(opts.map(o => o.trim())).size !== opts.length) console.warn(label + ': 同じ選択肢があります');
+      if (!c[1] || c[1].trim() === '') console.warn(label + ': 問題文が空欄です');
+      result.push({ id: c[0].trim(), q: c[1], options: opts, answer: answer, explanation: c[c.length - 1] });
+    });
+    const ids = result.map(q => q.id);
+    const dup = ids.filter((id, i) => ids.indexOf(id) !== i);
+    if (dup.length) console.warn(`${file}: IDが重複しています → ${[...new Set(dup)].join(', ')}`);
+    return result;
+  }
+
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function showQuestion() {
+    const q = questions[current];
+    document.getElementById('question').textContent = q.q;
+    const ul = document.getElementById('options');
+    ul.innerHTML = '';
+    q.options.forEach((opt, i) => {
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.textContent = opt;
+      btn.onclick = () => selectAnswer(i);
+      li.appendChild(btn);
+      ul.appendChild(li);
+    });
+    document.getElementById('progress').textContent = `${current + 1} / ${questions.length}`;
+  }
+
+  function selectAnswer(idx) {
+    const q = questions[current];
+    const btns = document.getElementById('options').querySelectorAll('button');
+    btns.forEach((btn, i) => {
+      btn.disabled = true;
+      if (i === q.answer) btn.style.background = '#d4edda';
+      else if (i === idx) btn.style.background = '#f8d7da';
+    });
+    const isCorrect = (idx === q.answer);
+    if (isCorrect) {
+      score++;
+      saveClearedId(q.id);
+    } else {
+      setWrongId(q.id, true);
+    }
+    const correctText = q.options[q.answer];
+    document.getElementById('modal-message').textContent = isCorrect ? '🟢 正解！' : '❌ 不正解';
+    document.getElementById('modal-explanation').innerHTML =
+      "正解：<strong>" + escapeHTML(correctText) + "</strong><br><br>" +
+      "<strong>解説:</strong><br>" + escapeHTML(q.explanation);
+    document.getElementById('overlay').style.display = 'flex';
+  }
+
+  document.getElementById('modalNextBtn').onclick = () => {
+    document.getElementById('overlay').style.display = 'none';
+    if (++current < questions.length) showQuestion();
+    else showResults();
+  };
+
+  function showResults() {
+    document.getElementById('quiz').style.display = 'none';
+    const r = document.getElementById('result');
+    document.getElementById('result-content').innerHTML = `
+      <h2 style="margin-top:0;">結果</h2>
+      <div style="font-size:2.5rem; font-weight:bold; margin-bottom:1rem;">${score} / ${questions.length}</div>
+    `;
+    r.style.display = 'block';
+  }
+</script>
+</body>
+</html>
